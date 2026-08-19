@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BillWise - User Dashboard</title>
+    <!-- Google Font: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-mint: #36b37e;
+            --primary-hover: #2e9b6d;
+            --mint-light: #e6f7f0;
+            --mint-pill: #d1fae5;
+            --text-dark-mint: #1b7a4e;
+            --bg-page: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --text-dim: #94a3b8;
+            --border-color: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.02);
+            --shadow-btn: 0 4px 14px rgba(54, 179, 126, 0.35);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Top mint green header curve background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, #36b37e 0%, #2ecc71 100%);
+            z-index: -1;
+            pointer-events: none;
+            box-shadow: 0 10px 25px rgba(54, 179, 126, 0.15);
+        }
+
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; pointer-events: none;
+        }
+
+        .app-container { display: flex; width: 100%; min-height: 100vh; }
+
+        aside {
+            width: 270px;
+            background: #ffffff;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2rem 1.25rem;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.03);
+        }
+
+        .logo-area {
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .logo-area h2 {
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--primary-mint);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-area::after {
+            content: 'USER';
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: var(--mint-light);
+            color: var(--text-dark-mint);
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .nav-links { list-style: none; display: flex; flex-direction: column; gap: 0.4rem; flex-grow: 1; }
+        .nav-links li a {
+            display: flex; align-items: center; gap: 0.85rem; padding: 0.85rem 1rem;
+            color: var(--text-muted); text-decoration: none; border-radius: 14px;
+            transition: all 0.2s ease; font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .nav-links li a:hover {
+            color: var(--text-main);
+            background: #f8fafc;
+            transform: translateX(3px);
+        }
+        .nav-links li.active a {
+            background: var(--mint-light);
+            color: var(--text-dark-mint);
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(54, 179, 126, 0.12);
+        }
+
+        main { 
+            margin-left: 270px; 
+            flex-grow: 1; 
+            padding: 2.25rem 3rem; 
+            overflow-y: auto; 
+            min-height: 100vh;
+        }
+
+        .header-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 2.25rem; background: var(--card-bg);
+            padding: 1.35rem 2rem; border-radius: 24px; 
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-card);
+        }
+
+        .user-welcome h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; color: var(--text-main); }
+        .user-welcome p { color: var(--text-muted); font-size: 0.875rem; margin-top: 4px; }
+
+        .view-section { display: none; animation: fadeIn 0.4s ease-in-out; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color); border-radius: 24px;
+            padding: 1.75rem; box-shadow: var(--shadow-card);
+            transition: all 0.25s ease;
+            position: relative; overflow: hidden;
+        }
+        .card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: var(--primary-mint);
+        }
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+        }
+        .card h3 { font-size: 0.825rem; color: var(--text-muted); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+        .card .value { font-size: 2.2rem; font-weight: 800; margin-bottom: 0.5rem; letter-spacing: -1px; color: var(--text-main); }
+
+        .badge { display: inline-flex; align-items: center; gap: 6px; padding: 0.35rem 0.85rem; border-radius: 30px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+        .badge.active { background: var(--mint-light); color: var(--text-dark-mint); }
+        .badge.danger { background: #fee2e2; color: #dc2626; }
+        .badge.warning { background: #fef3c7; color: #b45309; }
+        .badge.neutral { background: #e2e8f0; color: #475569; }
+
+        table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 1.25rem; background: var(--card-bg); border-radius: 20px; overflow: hidden; border: 1px solid var(--border-color); box-shadow: var(--shadow-card); }
+        th, td { padding: 1.1rem 1.5rem; text-align: left; }
+        th { background: #f8fafc; font-weight: 700; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border-color); }
+        td { font-size: 0.92rem; border-bottom: 1px solid #f1f5f9; color: var(--text-main); font-weight: 500; }
+        tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: #f0fdf4; }
+
+        .btn {
+            background: linear-gradient(135deg, #36b37e 0%, #2ecc71 100%); 
+            color: white; border: none; padding: 0.75rem 1.5rem;
+            border-radius: 30px; cursor: pointer; font-weight: 700; font-size: 0.875rem;
+            transition: all 0.25s ease;
+            box-shadow: var(--shadow-btn); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn:hover:not(:disabled) { 
+            background: linear-gradient(135deg, #2e9b6d 0%, #27ae60 100%);
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 20px rgba(54, 179, 126, 0.45); 
+        }
+        .btn:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; transform: none; }
+        
+        .btn-outline { 
+            background: #ffffff; 
+            border: 1px solid var(--border-color); 
+            color: var(--text-main); 
+            box-shadow: none;
+            border-radius: 30px;
+        }
+        .btn-outline:hover { 
+            background: var(--mint-light); 
+            color: var(--text-dark-mint);
+            border-color: var(--primary-mint);
+            transform: translateY(-2px);
+        }
+        .btn-danger { 
+            background: #ef4444; 
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+            border-radius: 30px;
+        }
+        .btn-danger:hover { 
+            background: #dc2626;
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45); 
+        }
+
+        .form-group { margin-bottom: 1.4rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-main); font-size: 0.825rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+        .form-control {
+            width: 100%; padding: 13px 16px; background: #f8fafc;
+            border: 1px solid var(--border-color); border-radius: 14px; color: var(--text-main); font-size: 0.95rem; font-family: 'Inter', sans-serif;
+            transition: all 0.25s ease;
+        }
+        .form-control:focus { outline: none; border-color: var(--primary-mint); background: #ffffff; box-shadow: 0 0 0 4px rgba(54, 179, 126, 0.15); }
+
+        /* Dynamic Plans Layout */
+        .pricing-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.75rem; margin-top: 1.5rem;
+        }
+        .pricing-card {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 24px; padding: 2.25rem; text-align: center;
+            display: flex; flex-direction: column; justify-content: space-between;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative; overflow: hidden;
+            box-shadow: var(--shadow-card);
+        }
+        .pricing-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: linear-gradient(90deg, #36b37e, #2ecc71);
+        }
+        .pricing-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary-mint);
+            box-shadow: 0 20px 40px rgba(54, 179, 126, 0.12);
+        }
+        .pricing-card h4 { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.3px; margin-bottom: 0.5rem; color: var(--text-main); }
+        .pricing-card .price { font-size: 2.5rem; font-weight: 800; margin: 1.25rem 0; color: var(--primary-mint); letter-spacing: -1px; }
+        .features-list { font-size: 0.9rem; color: var(--text-muted); text-align: left; margin: 20px 0; line-height: 1.8; }
+
+        /* --- NEW: Payment Modal Styles --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.3s ease;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-content {
+            background: #ffffff; border: 1px solid var(--border-color);
+            width: 100%; max-width: 420px; padding: 40px; border-radius: 28px; position: relative;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            transform: scale(0.95) translateY(20px); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .modal-overlay.active .modal-content { transform: scale(1) translateY(0); }
+        .modal-close {
+            position: absolute; top: 20px; right: 24px; background: #f1f5f9; border: none;
+            color: var(--text-muted); font-size: 1.4rem; width: 36px; height: 36px; border-radius: 50%;
+            cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center;
+        }
+        .modal-close:hover { background: #e2e8f0; color: var(--text-main); }
+    </style>
+</head>
+<body>
+    <div class="overlay"></div>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside>
+            <div>
+                <div class="logo-area">
+                    <h2>BillWise</h2>
+                </div>
+                <ul class="nav-links" id="navigationList">
+                    <li class="active"><a href="#" data-target="home-view">📊 <span>Dashboard</span></a></li>
+                    <li><a href="#" data-target="plans-view">💳 <span>Plans</span></a></li>
+                    <li><a href="#" data-target="subscription-view">📦 <span>Subscription</span></a></li>
+                    <li><a href="#" data-target="billing-view">📄 <span>Billing</span></a></li>
+                    <li><a href="#" data-target="profile-view">👤 <span>Profile</span></a></li>
+                </ul>
+            </div>
+            
+            <div>
+                <ul class="nav-links" style="margin-top: 1rem;">
+                    <li><a href="#" onclick="logout()">🚪 <span>Logout</span></a></li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main>
+            <header class="header-bar">
+                <div class="user-welcome">
+                    <h1 id="welcomeHeader">Welcome to BillWise!</h1>
+                    <p>Manage your account settings, subscription tiers, and invoices.</p>
+                </div>
+                <div>
+                    <span class="badge neutral" id="headerStatusBadge">Checking Status...</span>
+                </div>
+            </header>
+
+            <!-- 1. Dashboard / Home View -->
+            <section id="home-view" class="view-section active">
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <h3>Current Plan</h3>
+                        <div class="value" id="dashPlanName">Free Tier</div>
+                        <p style="color: var(--text-muted); font-size: 0.85rem;" id="dashPlanSubtext">Upgrade anytime</p>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 2rem;">
+                    <h3 style="margin-bottom: 0.75rem; font-size: 1.1rem; color: var(--text-main); text-transform: none;">Subscription Quick Actions</h3>
+                    <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.9rem;">Review your options, upgrade tiers, or check past billing data easily.</p>
+                    <button class="btn" onclick="switchView('plans-view')">View Available Plans</button>
+                    <button class="btn btn-outline" style="margin-left: 10px;" onclick="switchView('subscription-view')">Manage Subscription</button>
+                </div>
+            </section>
+
+            <!-- 2. Plans View (Dynamic Data from Backend) -->
+            <section id="plans-view" class="view-section">
+                <div style="margin-bottom: 1.5rem;">
+                    <h2 style="font-size: 1.5rem; font-weight: 800;">View Available Plans</h2>
+                    <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 4px;">Choose a plan that suits your personal or business goals.</p>
+                </div>
+                
+                <div class="pricing-grid" id="customerPlansGrid">
+                    <p style="color: var(--text-muted);">Loading plans from server...</p>
+                </div>
+            </section>
+
+            <!-- 3. Subscription Details View -->
+            <section id="subscription-view" class="view-section">
+                <div class="card">
+                    <h3 style="margin-bottom: 1.25rem; font-size: 1.1rem; color: var(--text-main); text-transform: none;">My Subscription Details</h3>
+                    <div id="subInfoContent">
+                        <p style="color: var(--text-muted); font-size: 0.9rem;">Fetching subscription data...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. Billing View (Dynamic Invoices) -->
+            <section id="billing-view" class="view-section">
+                <div style="margin-bottom: 1.5rem;">
+                    <h2 style="font-size: 1.5rem; font-weight: 800;">Invoice History</h2>
+                    <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 4px;">Review and manage your past billing statements.</p>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Invoice Ref</th>
+                            <th>Amount</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoicesTableBody">
+                        <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading invoices...</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- 5. Profile View -->
+            <section id="profile-view" class="view-section">
+                <div class="card" style="max-width: 600px;">
+                    <h3 style="margin-bottom: 1.5rem; font-size: 1.1rem; color: var(--text-main); text-transform: none;">View / Edit Profile</h3>
+                    <form onsubmit="saveProfile(event)">
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" class="form-control" id="profileName" placeholder="e.g. Harshdeep Sharma">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input type="text" class="form-control" id="profilePhone" placeholder="+1 (555) 000-0000">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <input type="email" class="form-control" id="profileEmail" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label>New Password (Optional)</label>
+                            <input type="password" class="form-control" id="profilePassword" placeholder="Leave blank to keep current password">
+                        </div>
+                        <button type="submit" class="btn" style="margin-top: 0.5rem;">Save Profile</button>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- --- NEW: THE CHECKOUT MODAL --- -->
+    <div class="modal-overlay" id="paymentModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closePaymentModal()">×</button>
+            <h2 style="margin-bottom: 6px; font-size: 1.4rem; font-weight: 800;">Complete Payment</h2>
+            <p style="color: var(--text-muted); margin-bottom: 24px; font-size: 0.9rem;" id="paymentModalDesc">Invoice #INV-XYZ • $0.00</p>
+
+            <form id="simulatedPaymentForm">
+                <div class="form-group">
+                    <label>Name on Card</label>
+                    <input type="text" class="form-control" placeholder="John Doe" required>
+                </div>
+                <div class="form-group">
+                    <label>Card Number</label>
+                    <input type="text" class="form-control" placeholder="•••• •••• •••• 4242" required maxlength="19">
+                </div>
+                <div style="display: flex; gap: 15px; margin-bottom: 1.4rem;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label>Expiry (MM/YY)</label>
+                        <input type="text" class="form-control" placeholder="12/25" required maxlength="5">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label>CVC</label>
+                        <input type="text" class="form-control" placeholder="123" required maxlength="4">
+                    </div>
+                </div>
+                <button type="submit" class="btn" style="width: 100%; justify-content: center; padding: 16px; font-size: 1rem;" id="confirmPaymentBtn">Pay Now</button>
+                <p style="text-align: center; font-size: 0.75rem; color: var(--text-dim); margin-top: 16px;">
+                    🔒 Secured by Mock Gateway 256-bit Encryption
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const API_BASE_URL = "http://127.0.0.1:8000";
+        let myCurrentSubscriptionId = null;
+        let myCurrentSubscriptionStatus = null;
+        
+        // Modal State Variables
+        let pendingInvoiceId = null;
+        let pendingCustomerId = null;
+        let pendingAmount = null;
+
+        // Navigation UI Logic
+        const navLinks = document.querySelectorAll('#navigationList li a');
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('data-target');
+                navLinks.forEach(l => l.parentElement.classList.remove('active'));
+                link.parentElement.classList.add('active');
+
+                document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+                document.getElementById(targetId).classList.add('active');
+            });
+        });
+
+        function switchView(targetId) {
+            document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+            document.getElementById(targetId).classList.add('active');
+            navLinks.forEach(l => {
+                if(l.getAttribute('data-target') === targetId) l.parentElement.classList.add('active');
+                else l.parentElement.classList.remove('active');
+            });
+        }
+
+        // Authentication & Data Loading
+        window.onload = () => {
+            const token = localStorage.getItem("access_token");
+            if (!token) {
+                alert("You must be logged in to view this page.");
+                window.location.href = "auth.html";
+                return;
+            }
+            
+            fetchMyProfile();
+            fetchCustomerPlans(); 
+            fetchMySubscription();
+            fetchMyInvoices();
+        };
+
+        function logout() {
+            localStorage.removeItem("access_token");
+            window.location.href = "auth.html";
+        }
+
+        // Helper for API calls
+        async function authFetch(endpoint, options = {}) {
+            const token = localStorage.getItem("access_token");
+            const headers = { 
+                "Authorization": `Bearer ${token}`, 
+                "Content-Type": "application/json", 
+                ...options.headers 
+            };
+            const response = await fetch(API_BASE_URL + endpoint, { ...options, headers });
+            if (response.status === 401) logout();
+            return response;
+        }
+
+        // FETCH PROFILE DATA
+        async function fetchMyProfile() {
+            try {
+                const response = await authFetch("/users/me/profile");
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('profileEmail').value = data.email || "";
+                    document.getElementById('profileName').value = data.full_name || "";
+                    document.getElementById('profilePhone').value = data.phone_number || "";
+                    const displayName = data.full_name || "User";
+                    document.getElementById('welcomeHeader').innerText = `Welcome, ${displayName}!`;
+                }
+            } catch (e) { console.error("Error fetching profile:", e); }
+        }
+
+        // SAVE PROFILE DATA
+        async function saveProfile(e) {
+            e.preventDefault(); 
+            const fullName = document.getElementById('profileName').value;
+            const phone = document.getElementById('profilePhone').value;
+            const password = document.getElementById('profilePassword').value;
+            
+            const payload = {};
+            if (fullName) payload.full_name = fullName;
+            if (phone) payload.phone_number = phone;
+            if (password) payload.password = password;
+
+            try {
+                const response = await authFetch("/users/me/profile", {
+                    method: "PUT", body: JSON.stringify(payload)
+                });
+                if (response.ok) {
+                    alert("Profile updated successfully!");
+                    document.getElementById('profilePassword').value = ""; 
+                    fetchMyProfile(); 
+                } else {
+                    const err = await response.json();
+                    alert("Error updating profile: " + JSON.stringify(err));
+                }
+            } catch (e) { console.error("Error saving profile:", e); }
+        }
+
+        // 1. READ PLANS (GET)
+        async function fetchCustomerPlans() {
+            const grid = document.getElementById("customerPlansGrid");
+            try {
+                const response = await fetch(`${API_BASE_URL}/plans/`);
+                const plans = await response.json();
+                grid.innerHTML = "";
+                if (plans.length === 0) {
+                    grid.innerHTML = "<p style='color: var(--text-muted);'>No active plans available at the moment.</p>";
+                    return;
+                }
+                plans.forEach(plan => {
+                    const features = plan.feature_entitlements ? plan.feature_entitlements.join("<br>✓ ") : "Standard Features";
+                    grid.innerHTML += `
+                        <div class="pricing-card">
+                            <div>
+                                <h4>${plan.name}</h4>
+                                <div class="price">$${plan.price}<span style="font-size: 0.9rem; font-weight: normal; color: var(--text-muted);">/mo</span></div>
+                                <div class="features-list">✓ ${features}</div>
+                            </div>
+                            <button class="btn btn-outline" style="margin-top: 1.5rem;" onclick="subscribePlan('${plan.id}', '${plan.name}')">Select Plan</button>
+                        </div>
+                    `;
+                });
+            } catch (error) { grid.innerHTML = `<p style="color: var(--danger);">Error fetching plans.</p>`; }
+        }
+
+        // 2. READ SUBSCRIPTION (GET)
+        async function fetchMySubscription() {
+            try {
+                const response = await authFetch("/subscriptions/me");
+                const subs = await response.json();
+                const dashPlanName = document.getElementById("dashPlanName");
+                const dashPlanSubtext = document.getElementById("dashPlanSubtext");
+                const headerBadge = document.getElementById("headerStatusBadge");
+                const subInfoContent = document.getElementById("subInfoContent");
+
+                if (subs.length === 0) {
+                    dashPlanName.innerText = "Free Tier";
+                    dashPlanSubtext.innerText = "Upgrade anytime";
+                    headerBadge.innerText = "FREE TIER";
+                    headerBadge.className = "badge neutral";
+                    subInfoContent.innerHTML = `<p style="color: var(--text-muted); font-size: 0.9rem;">You are not currently subscribed to a premium plan. Visit the Plans tab to upgrade.</p>`;
+                    return;
+                }
+
+                const sub = subs[0]; 
+                myCurrentSubscriptionId = sub.id;
+                myCurrentSubscriptionStatus = sub.status;
+
+                dashPlanName.innerText = `PLAN-${sub.plan_id.split('-')[0].toUpperCase()}`;
+                dashPlanSubtext.innerText = `Renews on ${new Date(sub.current_period_end).toLocaleDateString()}`;
+
+                headerBadge.innerText = sub.status.toUpperCase();
+                if (sub.status === "active" || sub.status === "trial") headerBadge.className = "badge active";
+                else if (sub.status === "cancelled") headerBadge.className = "badge danger";
+                else headerBadge.className = "badge warning";
+
+                let actionButtons = "";
+                if (sub.status === "active" || sub.status === "trial") {
+                    actionButtons = `
+                        <button class="btn btn-outline" onclick="pauseSub()">Pause Subscription</button>
+                        <button class="btn btn-danger" onclick="cancelSub()">Cancel Subscription</button>
+                    `;
+                } else if (sub.status === "paused") {
+                    actionButtons = `
+                        <button class="btn" onclick="resumeSub()">Resume Subscription</button>
+                        <button class="btn btn-danger" onclick="cancelSub()">Cancel Subscription</button>
+                    `;
+                }
+
+                subInfoContent.innerHTML = `
+                    <p style="margin-bottom: 8px;"><strong>Status:</strong> <span style="color: var(--text-dark-mint); font-weight: 700;">${sub.status.toUpperCase()}</span></p>
+                    <p style="margin-bottom: 8px;"><strong>Renewal Date:</strong> ${new Date(sub.current_period_end).toLocaleDateString()}</p>
+                    <p style="margin-bottom: 24px;"><strong>Plan ID:</strong> ${sub.plan_id}</p>
+                    <div style="display: flex; gap: 12px;">${actionButtons}</div>
+                `;
+            } catch (e) { console.error("Error fetching subscription:", e); }
+        }
+
+        // 3. READ INVOICES (GET)
+        async function fetchMyInvoices() {
+            try {
+                const response = await authFetch("/invoices/me");
+                const invoices = await response.json();
+                const tbody = document.getElementById("invoicesTableBody");
+                
+                tbody.innerHTML = "";
+                if (invoices.length === 0) {
+                    tbody.innerHTML = "<tr><td colspan='5' style='text-align: center; color: var(--text-muted);'>No past invoices found.</td></tr>";
+                    return;
+                }
+
+                invoices.forEach(inv => {
+                    const shortId = inv.id.split('-')[0].toUpperCase();
+                    const invoiceNum = inv.invoice_number || '#INV-'+shortId;
+                    const dueDate = inv.due_date ? new Date(inv.due_date).toLocaleDateString() : "Due Immediately";
+                    
+                    let badgeClass = "badge neutral";
+                    if (inv.status === "paid") badgeClass = "badge active";
+                    else if (inv.status === "open") badgeClass = "badge warning";
+                    else if (inv.status === "uncollectible") badgeClass = "badge danger";
+
+                    let actionButtons = `
+                        <button class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.75rem; margin-right: 4px;" 
+                            onclick="downloadPDF('${inv.id}', '${invoiceNum}')">
+                            📥 PDF
+                        </button>
+                    `;
+
+                    // --- UPDATED: THIS NOW OPENS THE MODAL INSTEAD OF FIRING THE REQUEST ---
+                    if (inv.status === "open") {
+                        actionButtons += `
+                            <button class="btn" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;" 
+                                onclick="openPaymentModal('${inv.id}', '${inv.customer_id}', ${inv.amount_due}, '${invoiceNum}')">
+                                💳 Pay Now
+                            </button>
+                        `;
+                    }
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td style="font-weight: 600;">${invoiceNum}</td>
+                            <td style="font-weight: 700; color: var(--text-dark-mint);">$${parseFloat(inv.amount_due).toFixed(2)}</td>
+                            <td>${dueDate}</td>
+                            <td><span class="${badgeClass}">${inv.status.toUpperCase()}</span></td>
+                            <td>${actionButtons}</td>
+                        </tr>
+                    `;
+                });
+            } catch (e) { console.error("Error fetching invoices:", e); }
+        }
+
+        // 4. SUBSCRIPTION ACTIONS (POST/PUT)
+        async function subscribePlan(planId, planName) {
+            if(!confirm(`Are you sure you want to select the ${planName} plan?`)) return;
+            try {
+                let res;
+                if (myCurrentSubscriptionId && myCurrentSubscriptionStatus !== 'cancelled') {
+                    res = await authFetch(`/subscriptions/${myCurrentSubscriptionId}/change_plan?new_plan_id=${planId}`, { method: "PUT" });
+                } else {
+                    res = await authFetch("/subscriptions/", { method: "POST", body: JSON.stringify({ plan_id: planId }) });
+                }
+                if (res.ok) {
+                    alert(`Successfully processed your request for ${planName}!`);
+                    fetchMySubscription(); fetchMyInvoices(); switchView('billing-view'); 
+                } else {
+                    const err = await res.json(); alert("Error processing subscription: " + JSON.stringify(err));
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function pauseSub() {
+            if(!confirm("Are you sure you want to pause your subscription?")) return;
+            await authFetch(`/subscriptions/${myCurrentSubscriptionId}/pause`, { method: "PUT" }); fetchMySubscription();
+        }
+
+        async function resumeSub() {
+            await authFetch(`/subscriptions/${myCurrentSubscriptionId}/resume`, { method: "PUT" }); fetchMySubscription();
+        }
+
+        async function cancelSub() {
+            const immediate = confirm("Click OK to cancel immediately. Click Cancel to let it expire at the end of your billing cycle.");
+            await authFetch(`/subscriptions/${myCurrentSubscriptionId}/cancel`, { method: "PUT", body: JSON.stringify({ immediate: immediate }) });
+            fetchMySubscription();
+        }
+
+        // 5. SECURE PDF DOWNLOAD
+        async function downloadPDF(invoiceId, invoiceNumber) {
+            try {
+                const response = await authFetch(`/invoices/${invoiceId}/pdf`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.style.display = 'none'; a.href = url; a.download = `${invoiceNumber || 'Invoice'}.pdf`; 
+                    document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url); document.body.removeChild(a);
+                } else { alert("Error downloading PDF. Are you authenticated?"); }
+            } catch (e) { console.error("PDF Download Error:", e); }
+        }
+
+        // --- NEW: CHECKOUT MODAL LOGIC ---
+        function openPaymentModal(invoiceId, customerId, amountDue, invoiceNumber) {
+            // Save details to global variables so the form submission can access them
+            pendingInvoiceId = invoiceId;
+            pendingCustomerId = customerId;
+            pendingAmount = amountDue;
+
+            // Update modal text dynamically
+            const formattedAmount = parseFloat(amountDue).toFixed(2);
+            document.getElementById('paymentModalDesc').innerText = `Invoice ${invoiceNumber} • $${formattedAmount}`;
+            document.getElementById('confirmPaymentBtn').innerText = `Pay $${formattedAmount}`;
+
+            // Show the modal
+            document.getElementById('paymentModal').classList.add('active');
+        }
+
+        function closePaymentModal() {
+            document.getElementById('paymentModal').classList.remove('active');
+            document.getElementById('simulatedPaymentForm').reset();
+            
+            // Reset button state just in case
+            const btn = document.getElementById('confirmPaymentBtn');
+            btn.disabled = false;
+            btn.innerText = `Pay Now`;
+        }
+
+        // Process the Payment Form Submission
+        document.getElementById("simulatedPaymentForm").addEventListener("submit", async (e) => {
+            e.preventDefault(); 
+            
+            // Change button to look like it is processing
+            const btn = document.getElementById('confirmPaymentBtn');
+            btn.disabled = true;
+            btn.innerText = "Processing Payment...";
+
+            try {
+                const res = await authFetch("/mock-bank/charge", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        invoice_id: pendingInvoiceId,
+                        customer_id: pendingCustomerId,
+                        amount: pendingAmount
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    // Close the modal instantly
+                    closePaymentModal();
+                    
+                    alert(`${data.message}\n\n(Wait ~3 seconds, then we will automatically refresh the table to check the webhook result!)`);
+                    
+                    // Automatically refresh after bank processing time (2s + 1s buffer)
+                    setTimeout(() => {
+                        fetchMyInvoices();
+                        fetchMySubscription(); 
+                    }, 3000);
+                } else {
+                    const err = await res.json();
+                    alert("Failed to initiate payment: " + JSON.stringify(err));
+                    btn.disabled = false; // Re-enable button if request failed
+                }
+            } catch (error) {
+                console.error("Payment Error:", error);
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
