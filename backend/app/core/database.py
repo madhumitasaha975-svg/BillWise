@@ -1,14 +1,12 @@
 from collections.abc import AsyncIterator
-
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
-# One engine per process: it owns the connection pool.
-engine = create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
+# NullPool ensures asyncpg connections are never tied to closed event loops across requests/tests
+engine = create_async_engine(settings.database_url, echo=False, poolclass=NullPool)
 
-# expire_on_commit=False: objects stay readable after commit
-# (async can't lazily reload attributes behind your back).
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
