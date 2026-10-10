@@ -351,3 +351,69 @@ This guide compiles every core technical and system design question you can be a
 > Allowing a customer to switch tiers, upgrade, or calculate new proration charges while their previous invoice is delinquent would create compounded debt, race conditions in period dates, and credit leakage.
 > Subscriptions must be restored to `ACTIVE` before any mid-cycle plan modifications can be initiated."
 
+---
+
+# 📅 DAY 5 (PART 2) — MODULE 6: PDF INVOICING & SECURE DOWNLOADS
+
+### Q36: "Why should a production backend avoid saving generated PDF files to the local filesystem?"
+> **Answer:**
+> "Saving static files to local server disk creates severe operational anti-patterns:
+> 1. **Disk Exhaustion**: At scale, hundreds of thousands of customer invoices will rapidly consume storage capacity and trigger system outages.
+> 2. **Multi-Server Container State Inconsistency**: Modern cloud backends (AWS ECS, Kubernetes, Render) run multiple container replicas behind a load balancer. If Container 1 generates and saves a PDF locally, an immediate download request routed to Container 2 will return `404 Not Found`.
+> 3. **Stale Cache Invalidation**: If an invoice transitions from `OPEN` to `PAID`, a stale PDF file sitting on disk might inadvertently be served to users.
+> 
+> Generating the PDF **dynamically in RAM** using `io.BytesIO` ensures our servers remain completely **stateless**, instantly scalable, and always reflective of current database state."
+
+---
+
+### Q37: "How do you generate and stream a binary PDF in FastAPI without saving it to disk?"
+> **Answer:**
+> "We combine Python's `io.BytesIO` buffer with FastAPI's `Response` object:
+> 1. We instantiate an in-memory byte buffer: `buffer = io.BytesIO()`.
+> 2. ReportLab's `SimpleDocTemplate` compiles the document elements (flowables) directly into this buffer: `doc.build(elements)`.
+> 3. We extract the compiled raw bytes: `pdf_bytes = buffer.getvalue()`.
+> 4. We return a FastAPI `Response`:
+>    ```python
+>    return Response(
+>        content=pdf_bytes,
+>        media_type="application/pdf",
+>        headers={"Content-Disposition": f'attachment; filename="{invoice.number}.pdf"'}
+>    )
+>    ```
+> 5. The memory buffer is immediately closed and garbage-collected, preventing RAM leaks."
+
+---
+
+### Q38: "What is an Insecure Direct Object Reference (IDOR) vulnerability, and how did you prevent it in the invoice download endpoint?"
+> **Answer:**
+> "An IDOR vulnerability occurs when an API accepts a database identifier (such as `/api/invoices/{id}/pdf`) and returns the underlying resource without verifying whether the authenticated caller actually owns that resource.
+> Without protection, an attacker logged in as User B could brute-force invoice UUIDs and download sensitive billing receipts and PII belonging to User A.
+> 
+> In BillWise, our route handler enforces **Tenant Isolation**:
+> 1. We decode the caller's JWT to get `current_user.id`.
+> 2. We resolve the user's `Customer` profile.
+> 3. We compare `invoice.customer_id == customer.id`.
+> 4. If they do not match (and the caller is not an Admin), the request is rejected immediately with **`403 Forbidden`**."
+
+---
+
+### Q39: "What is the purpose of the `Content-Disposition` header when serving PDF files?"
+> **Answer:**
+> "The `Content-Disposition` response header dictates how the user's browser should handle the incoming binary payload:
+> * `inline`: Tells the browser to render the PDF directly inside the browser's built-in PDF viewer tab.
+> * `attachment; filename="INV-2026-000001.pdf"`: Prompts the browser's native 'Save As' download dialog with a pre-populated, clean filename.
+> 
+> In BillWise, we specify `attachment` with the sequential invoice number so users can conveniently store branded records for expense filing."
+
+---
+
+### Q40: "How do you verify in automated tests that a generated binary response is a valid PDF?"
+> **Answer:**
+> "Under the ISO 32000 standard, every valid PDF document must begin with the 4-byte magic signature **`%PDF`** (typically `%PDF-1.4`).
+> In our Pytest suite (`test_invoices_pdf.py`):
+> 1. We assert that `isinstance(pdf_bytes, bytes)` and `len(pdf_bytes) > 1000`.
+> 2. We assert that `pdf_bytes.startswith(b"%PDF")`.
+> 3. We verify that the HTTP response returns `headers['content-type'] == 'application/pdf'`.
+> This guarantees valid document compilation without needing a headless browser or heavy external PDF parsing tools."
+
+

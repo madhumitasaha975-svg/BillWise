@@ -42,3 +42,11 @@
 - **State Machine Protection**: Our strict state machine rules prevent illegal jumps (e.g. `trialing -> past_due` was prevented because you cannot owe debt on an unactivated trial). Subscriptions must move `ACTIVE -> PAST_DUE -> SUSPENDED` (if exhausted) or `PAST_DUE -> ACTIVE` (if recovered).
 - **Immutable Audit Trails**: Financial systems require complete accountability. Every dunning action (`entered_past_due`, `retry_failed`, `recovered`, `exhausted_suspended`) writes an immutable record to the `audit_logs` table with details of attempt numbers, invoice numbers, and error reasons for customer support and audit reviews.
 
+---
+
+## Day 5 (Part 2) - Module 6 (PDF Invoice Generation & Secure Downloads)
+- **In-Memory Streaming vs. Disk Storage**: Saving static PDF files to disk causes SSD exhaustion, container synchronization issues in multi-server clouds, and stale cache bugs. By generating the document in RAM using `io.BytesIO` and streaming directly with FastAPI's `Response(content=pdf_bytes, media_type="application/pdf")`, the backend remains completely stateless.
+- **ReportLab Flowables Architecture**: ReportLab constructs documents via Flowables (`Paragraph`, `Spacer`, `Table`, `HRFlowable`) inside a `SimpleDocTemplate`. `TableStyle` allows programmatic borders, cell padding, background colors, and column widths for clean tabular accounting statements.
+- **Insecure Direct Object Reference (IDOR) Defense**: Financial invoices contain sensitive PII and billing amounts. When exposing `/api/invoices/{id}/pdf`, the backend must explicitly verify that the invoice's `customer_id` matches the authenticated caller's profile. Unauthorized requests from other tenants must be rejected with `403 Forbidden`.
+
+

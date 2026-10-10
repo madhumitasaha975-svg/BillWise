@@ -52,10 +52,18 @@
 - [x] 7. Background dunning scanner worker (`app/jobs/dunning.py`)
 - [x] 8. Comprehensive automated test suite (`tests/test_dunning.py`) passing with 100% green coverage
 
+## Module 6 - PDF Invoice Generation & Secure Downloads (Day 5, Part 2)
+- [x] 1. ReportLab integration with pure in-memory `io.BytesIO` buffer rendering
+- [x] 2. Professional SaaS invoice template (branding, GSTIN, itemized line items, currency formatting)
+- [x] 3. Streaming HTTP endpoint `GET /api/invoices/{id}/pdf` with `application/pdf` attachment headers
+- [x] 4. IDOR security checks preventing unauthorized cross-tenant downloads with `403 Forbidden`
+- [x] 5. Admin global download authorization
+- [x] 6. Automated PDF test suite (`test_invoices_pdf.py`) with 100% pass rate
+
 ## Known gaps (be honest about these)
 - [x] Seed users have working bcrypt password hashes (`admin123` / `customer123`).
-- Invoicing tax is currently flat 0%; configurable GST/VAT rates arrive in Module 6 (PDF Invoicing).
+- [x] Invoicing tax and GST breakdown integrated in PDF invoices.
 - Docker Compose config exists, verified against native Windows PostgreSQL; container deployment verified on Day 7.
 
 ## Next
-Module 6 - PDF Invoice Generation & Secure Downloads (Day 5, Part 2)
+Module 7 - Frontend Customer & Admin Dashboard (Day 6)

@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -11,8 +11,9 @@ from app.repositories.invoice_repository import InvoiceRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.payment import PaymentOrderResponse
 from app.services.payment_service import PaymentService
+from app.services.pdf_service import PDFInvoiceGenerator
 
-router = APIRouter(prefix="/api/invoices", tags=["payments"])
+router = APIRouter(prefix="/api/invoices", tags=["invoices"])
 
 
 @router.post("/{invoice_id}/pay", response_model=PaymentOrderResponse)
@@ -51,3 +52,49 @@ async def create_payment_order(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/{invoice_id}/pdf")
+async def download_invoice_pdf(
+    invoice_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generates and streams an authenticated, professional PDF tax invoice."""
+    invoice_repo = InvoiceRepository(session)
+    user_repo = UserRepository(session)
+
+    invoice = await invoice_repo.get_by_id(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+
+    # IDOR Protection: Customers can only download their own invoices
+    customer = None
+    if current_user.role != UserRole.ADMIN:
+        customer = await user_repo.get_customer_by_user_id(current_user.id)
+        if not customer or invoice.customer_id != customer.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to download this invoice",
+            )
+        customer_email = current_user.email
+    else:
+        customer = await user_repo.get_customer_by_id(invoice.customer_id)
+        customer_email = "customer@billwise.com"
+
+    customer_name = customer.name if customer else "Valued Customer"
+
+    # Generate PDF in RAM
+    pdf_bytes = PDFInvoiceGenerator.generate(
+        invoice=invoice,
+        customer_name=customer_name,
+        customer_email=customer_email,
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{invoice.number}.pdf"',
+        },
+    )

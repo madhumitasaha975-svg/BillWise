@@ -26,6 +26,10 @@ class UserRepository:
         result = await self.session.execute(select(Customer).where(Customer.user_id == user_id))
         return result.scalar_one_or_none()
 
+    async def get_customer_by_id(self, customer_id) -> Customer | None:
+        result = await self.session.execute(select(Customer).where(Customer.id == customer_id))
+        return result.scalar_one_or_none()
+
     async def add_customer(self, customer: Customer) -> Customer:
         self.session.add(customer)
         await self.session.flush()
