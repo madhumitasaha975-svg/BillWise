@@ -564,3 +564,81 @@ This guide compiles every core technical and system design question you can be a
 >
 > In production with Kubernetes, `Deployment` replicas and liveness/readiness probes provide the same guarantees at scale."
 
+---
+
+# 📅 DAY 8 — MODULE 9: DECOUPLED SAAS ARCHITECTURE, FEATURE GATING & CELERY WORKERS
+
+### Q53: "What is a Decoupled Billing Architecture, and how does BillWise demonstrate it?"
+> **Answer:**
+> "In high-scale software companies, billing logic should never be tightly coupled with the core product business logic. Doing so leads to monolithic codebases where changes to pricing plans risk breaking user-facing applications.
+>
+> In BillWise:
+> 1. The billing engine runs as a **standalone microservice** with its own database tables (Plans, Subscriptions, Invoices, Payments, Dunning).
+> 2. To demonstrate real-world consumption, we built a simulated **'Cloud Infrastructure Provider'** SaaS interface.
+> 3. When a customer tries to deploy a virtual server or spin up compute resources, the cloud provider queries BillWise's feature gating API (`/api/cloud/resources`) to determine:
+>    - What tier is this tenant on? (`starter`, `pro`, `enterprise`)
+>    - Are they within their server and CPU/RAM quotas?
+>    - Is the subscription in good standing (`ACTIVE`) or past due?
+> 4. If the tenant upgrades or downgrades their plan in BillWise, the cloud provider dynamically unlocks or restricts resources in real time without any code changes."
+
+---
+
+### Q54: "How does Dynamic Feature Gating work in BillWise? What happens when a tenant upgrades or their payment fails?"
+> **Answer:**
+> "Feature gating in BillWise is enforced at the backend dependency and router layer, not just by hiding UI buttons:
+>
+> 1. **Tier Quota Enforcement**:
+>    - `Free / Starter`: Maximum 2 servers, 2 vCPUs, 4GB RAM. Premium add-ons like **Cloud Load Balancers** are locked. If a tenant attempts to deploy a Load Balancer, the API rejects the request with `403 Forbidden` (`Feature Gated`).
+>    - `Pro / Enterprise`: Up to 5+ servers, 8+ vCPUs, and Cloud Load Balancers are **UNLOCKED**.
+> 2. **Mid-Cycle Upgrade**:
+>    - When a customer upgrades from Starter to Pro, BillWise calculates second-level proration, charges the net difference, and updates the plan ID. Instantly, the cloud console allows them to provision Load Balancers and higher compute instances.
+> 3. **Payment Failure & Dunning Throttling**:
+>    - If a recurring payment fails, the webhook transitions the subscription to `PAST_DUE`.
+>    - The cloud provider detects the status, locks new server launches with `403 Forbidden` (`Billing Gate`), and marks active instances as `THROTTLED`.
+>    - As soon as the customer or the automated dunning retry recovers the invoice payment, status returns to `ACTIVE` and compute resources are automatically un-throttled."
+
+---
+
+### Q55: "Why did you implement asynchronous background processing using Celery and Redis?"
+> **Answer:**
+> "Billing systems perform many heavy, time-consuming operations:
+> - Scanning thousands of customer subscriptions to check for period renewals (`process_due_renewals`).
+> - Executing dunning retry schedules across credit card gateways (`process_dunning_retries`).
+> - Dispatching transactional emails (GST invoices, payment receipts, past-due dunning warnings).
+>
+> If we ran these synchronously inside a FastAPI request thread, HTTP requests would take multiple seconds or time out.
+> By integrating **Celery** with **Redis** as the message broker:
+> 1. The web application immediately enqueues a background task into Redis and returns a fast HTTP response (`202 Accepted` or `200 OK`) in under 50ms.
+> 2. Dedicated Celery worker containers running in Docker pull tasks from Redis and process them concurrently without competing with the web API for CPU or event-loop threads.
+> 3. Celery provides retry backoff, task tracking, and worker concurrency out of the box."
+
+---
+
+### Q56: "How did you design the administrative analytics and the interactive billing calendar?"
+> **Answer:**
+> "The Admin Control Center provides real-time financial telemetry for executive decision-making:
+>
+> 1. **Real-time MRR & ARR**:
+>    - Monthly Recurring Revenue (MRR) is calculated by summing `plan.price_minor` for all `SubscriptionStatus.ACTIVE` tenants. ARR is projected as `MRR * 12`.
+> 2. **Chart.js Financial Visualizations**:
+>    - We integrated `chart.js` and `react-chartjs-2` to render a 6-month historical MRR and tax-invoiced revenue growth line chart with smooth bezier curves and responsive hover tooltips.
+>    - A Doughnut chart visually communicates subscriber distribution across product tiers (Starter, Pro, Business, Enterprise).
+> 3. **Global Billing Calendar**:
+>    - A dedicated analytics query fetches upcoming subscription renewal dates across all tenants for the next 30 days.
+>    - It renders a chronological renewal calendar showing the scheduled date, customer email, plan name, renewal fee in ₹, and status badge (`ACTIVE` vs `PAST_DUE`), allowing administrators to forecast cashflow and track impending churn risks."
+
+---
+
+### Q57: "Walk me through how the simulated payment gateway and webhook pipeline work end-to-end."
+> **Answer:**
+> "To test real-world payment scenarios without requiring live banking credentials, BillWise provides an end-to-end payment gateway simulation:
+>
+> 1. **Order Creation**: The customer clicks 'Pay Now' or 'Simulate Pay', triggering `POST /api/invoices/{id}/pay`. The backend creates a payment order with an ID and integer minor amount.
+> 2. **Real-time Webhook Pipeline**:
+>    - In production, gateways like Razorpay send an asynchronous HTTP POST to `/api/webhooks/razorpay` with a signature header (`X-Razorpay-Signature`).
+>    - Our webhook listener validates the signature using constant-time `hmac.compare_digest` to prevent timing attacks.
+> 3. **Interactive Simulation Modal**:
+>    - In the Customer Portal, we added a dedicated simulation modal with two instant triggers:
+>      - **Simulate Succeeded (200 OK)**: Captures payment, updates invoice to `PAID`, subscription to `ACTIVE`, un-throttles cloud instances, and creates a payment transaction record.
+>      - **Simulate Failed (Card Declined)**: Triggers `payment.failed`, transitions subscription to `PAST_DUE`, triggers the automated dunning recovery engine, and throttles cloud compute resources.
+> 4. **Idempotency**: The webhook processor checks event IDs against an idempotency ledger, preventing duplicate charges if the gateway retries the webhook delivery."
