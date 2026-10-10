@@ -60,10 +60,21 @@
 - [x] 5. Admin global download authorization
 - [x] 6. Automated PDF test suite (`test_invoices_pdf.py`) with 100% pass rate
 
+## Module 7 - Frontend Customer & Admin Dashboard (Day 6)
+- [x] 1. React 19 + Vite 8 scaffold with Tailwind CSS v4 styling
+- [x] 2. Centralized Axios client with JWT Bearer injection and 401 transparent token refresh
+- [x] 3. Global AuthProvider with claims decoding and login/logout lifecycle
+- [x] 4. Customer Billing Dashboard (live plan card, status badges, invoices table)
+- [x] 5. Mid-cycle plan change modal with real-time proration feedback
+- [x] 6. Direct in-browser streaming PDF tax invoice download
+- [x] 7. Admin Control Plane (revenue metrics, tenant subscriptions, scheduled job triggers, audit trail)
+- [x] 8. Production-grade 3D BillWise Landing Page (interactive mouse tilt, floating depth cards, live proration visualizer, dunning recovery cards, dark CTA)
+- [x] 9. Production build verified (`dist/` compiled with 0 errors)
+
 ## Known gaps (be honest about these)
 - [x] Seed users have working bcrypt password hashes (`admin123` / `customer123`).
 - [x] Invoicing tax and GST breakdown integrated in PDF invoices.
 - Docker Compose config exists, verified against native Windows PostgreSQL; container deployment verified on Day 7.
 
 ## Next
-Module 7 - Frontend Customer & Admin Dashboard (Day 6)
+Module 8 - Production Deployment & Docker Compose Verification (Day 7)

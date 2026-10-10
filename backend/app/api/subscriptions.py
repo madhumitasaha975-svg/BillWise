@@ -1,10 +1,12 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models import User
+from app.models import Subscription, User
 from app.models.enums import UserRole
 from app.repositories.user_repository import UserRepository
 from app.schemas.subscription import (
@@ -19,6 +21,28 @@ from app.services.subscription_service import (
 )
 
 router = APIRouter(prefix="/api/subscriptions", tags=["subscriptions"])
+
+
+@router.get("/me", response_model=SubscriptionResponse | None)
+async def get_my_subscription(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fetches the current user's latest subscription."""
+    user_repo = UserRepository(session)
+    customer = await user_repo.get_customer_by_user_id(current_user.id)
+    if not customer:
+        return None
+
+    stmt = (
+        select(Subscription)
+        .options(selectinload(Subscription.plan))
+        .where(Subscription.customer_id == customer.id)
+        .order_by(Subscription.created_at.desc())
+    )
+    result = await session.execute(stmt)
+    return result.scalars().first()
+
 
 
 @router.get("/{subscription_id}", response_model=SubscriptionResponse)

@@ -1,11 +1,13 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import User
+from app.models import Invoice, User
 from app.models.enums import UserRole
 from app.repositories.invoice_repository import InvoiceRepository
 from app.repositories.user_repository import UserRepository
@@ -14,6 +16,50 @@ from app.services.payment_service import PaymentService
 from app.services.pdf_service import PDFInvoiceGenerator
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
+
+
+@router.get("/me")
+async def get_my_invoices(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fetches all invoices belonging to the logged-in customer."""
+    user_repo = UserRepository(session)
+    customer = await user_repo.get_customer_by_user_id(current_user.id)
+    if not customer:
+        return []
+
+    stmt = (
+        select(Invoice)
+        .options(selectinload(Invoice.line_items))
+        .where(Invoice.customer_id == customer.id)
+        .order_by(Invoice.created_at.desc())
+    )
+    result = await session.execute(stmt)
+    invoices = result.scalars().all()
+    return [
+        {
+            "id": str(inv.id),
+            "number": inv.number,
+            "status": inv.status.value,
+            "currency": inv.currency,
+            "subtotal_minor": inv.subtotal_minor,
+            "tax_minor": inv.tax_minor,
+            "total_minor": inv.total_minor,
+            "created_at": inv.created_at,
+            "paid_at": inv.paid_at,
+            "line_items": [
+                {
+                    "description": item.description,
+                    "kind": item.kind.value,
+                    "amount_minor": item.amount_minor,
+                }
+                for item in inv.line_items
+            ],
+        }
+        for inv in invoices
+    ]
+
 
 
 @router.post("/{invoice_id}/pay", response_model=PaymentOrderResponse)

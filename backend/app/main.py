@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.payments import router as payments_router
@@ -16,3 +17,4 @@ app.include_router(auth_router)
 app.include_router(subscriptions_router)
 app.include_router(payments_router)
 app.include_router(webhooks_router)
+app.include_router(admin_router)

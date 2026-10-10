@@ -49,4 +49,13 @@
 - **ReportLab Flowables Architecture**: ReportLab constructs documents via Flowables (`Paragraph`, `Spacer`, `Table`, `HRFlowable`) inside a `SimpleDocTemplate`. `TableStyle` allows programmatic borders, cell padding, background colors, and column widths for clean tabular accounting statements.
 - **Insecure Direct Object Reference (IDOR) Defense**: Financial invoices contain sensitive PII and billing amounts. When exposing `/api/invoices/{id}/pdf`, the backend must explicitly verify that the invoice's `customer_id` matches the authenticated caller's profile. Unauthorized requests from other tenants must be rejected with `403 Forbidden`.
 
+---
+
+## Day 6 - Module 7 (Frontend Customer & Admin Dashboard)
+- **Axios Interceptor Pattern**: Instead of injecting authentication tokens manually into every individual fetch call, an Axios request interceptor reads `localStorage.getItem('access_token')` and injects `Authorization: Bearer <token>` globally. The response interceptor catches `401 Unauthorized`, calls `/api/auth/refresh`, and seamlessly retries the failed request without logging out the user.
+- **Client-Side Token Decoding (atob)**: Since JWT tokens are Base64URL encoded JSON payloads, the frontend can decode user claims (`sub`, `role`) instantly without an expensive extra round-trip network call, enabling instantaneous role-based routing.
+- **In-Browser Binary Blob Downloads**: When downloading binary PDFs from the backend, setting Axios `responseType: 'blob'` allows the browser to wrap the binary data in a `window.URL.createObjectURL(blob)`, creating a virtual download link that triggers native browser saving without page reloads.
+- **Dev Server Reverse Proxying**: Configuring Vite's `server.proxy` forwards `/api` requests directly to `http://localhost:8000`. This completely eliminates Cross-Origin Resource Sharing (CORS) preflight issues during local development and enables production-identical relative API paths.
+
+
 

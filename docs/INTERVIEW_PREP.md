@@ -416,4 +416,59 @@ This guide compiles every core technical and system design question you can be a
 > 3. We verify that the HTTP response returns `headers['content-type'] == 'application/pdf'`.
 > This guarantees valid document compilation without needing a headless browser or heavy external PDF parsing tools."
 
+---
+
+# 📅 DAY 6 — MODULE 7: FRONTEND CUSTOMER & ADMIN DASHBOARD
+
+### Q41: "Explain how you implemented the Axios Interceptor pattern for JWT authentication and token refresh rotation."
+> **Answer:**
+> "In BillWise, rather than manually attaching auth headers to every component API call:
+> 1. **Request Interceptor**: Intercepts every outgoing request, retrieves the access token from `localStorage`, and injects `headers.Authorization = 'Bearer ' + token`.
+> 2. **Response Interceptor (Transparent Token Rotation)**:
+>    * Listens for `401 Unauthorized` responses.
+>    * If a `401` occurs and hasn't been retried yet (`!originalRequest._retry`), it sets `_retry = true`.
+>    * It calls `/api/auth/refresh` using the stored `refresh_token`.
+>    * Upon receiving fresh access and refresh tokens, it updates `localStorage`, rewires the original request's auth header, and replays the original API call.
+>    * The customer never sees an error and never gets logged out mid-action."
+
+---
+
+### Q42: "How do you handle binary file downloads (like streaming PDF invoices) in an authenticated React application?"
+> **Answer:**
+> "A traditional `<a href='/api/invoices/123/pdf'>` tag cannot attach custom HTTP `Authorization: Bearer <token>` headers.
+> To download secured binary files:
+> 1. We issue an authenticated Axios request specifying `responseType: 'blob'`.
+> 2. When the binary bytes arrive, we create a temporary in-memory Object URL using `window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))`.
+> 3. We dynamically create an invisible anchor tag `<a download='INV-XXXXXX.pdf' href={url}>`, append it to the DOM, programmatically trigger `.click()`, and remove it.
+> 4. Finally, we call `window.URL.revokeObjectURL(url)` to clean up browser RAM."
+
+---
+
+### Q43: "What is Cross-Origin Resource Sharing (CORS), and how did you resolve it during development and production?"
+> **Answer:**
+> "CORS is a browser security mechanism that restricts a web application running at one origin (e.g. `http://localhost:5173`) from making HTTP requests to a different origin (e.g. `http://localhost:8000`) without server permission.
+> In BillWise, we resolved this using **Reverse Proxying**:
+> * In development, we configured Vite's dev server proxy: requests matching `/api/*` are internally forwarded by Vite's Node server to `http://localhost:8000`. The browser thinks it's talking to the same origin, eliminating preflight `OPTIONS` overhead and CORS errors.
+> * In production, Nginx or Docker container reverse proxies both the built React static bundle and FastAPI behind the exact same domain."
+
+---
+
+### Q44: "How does the frontend decode user roles without making extra network requests to the backend?"
+> **Answer:**
+> "A JSON Web Token (JWT) is composed of Header, Payload, and Signature separated by dots.
+> The Payload is a Base64URL-encoded JSON string containing standard claims (`sub`, `role`, `exp`).
+> On the frontend, we use client-side decoding (`atob()`) to parse the JSON claims immediately upon receiving the token.
+> This allows our `AuthProvider` and `ProtectedRoute` components to instantaneously determine whether the user is an `admin` or `customer` and render the appropriate dashboard without waiting for an extra round-trip user profile API query."
+
+---
+
+### Q45: "How did you design Role-Based Route Guards in React Router?"
+> **Answer:**
+> "We created a reusable `<ProtectedRoute requiredRole={...}>` wrapper component:
+> 1. It inspects the `useAuth()` context.
+> 2. If the user is unauthenticated, it returns `<Navigate to='/login' replace />`.
+> 3. If a specific role is required (e.g. `requiredRole='admin'`) and the user's role is `customer`, it redirects them to `/dashboard` to prevent privilege escalation.
+> 4. If authorized, it renders the child route wrapped in the global `<Navbar />`."
+
+
 
