@@ -1,0 +1,51 @@
+# PROGRESS
+
+## Module 1 - Foundations (Day 1)
+- [x] 1. Repo skeleton, .gitignore, .env.example
+- [x] 2. Schema designed on paper (docs/schema.md)
+- [x] 3. FastAPI skeleton + /health
+- [x] 4. Async SQLAlchemy engine/session + get_db dependency
+- [x] 5. Models for all 10 tables
+- [x] 6. Alembic + first migration executed against PostgreSQL
+- [x] 7. Subscription state machine + unit tests
+- [x] 8. Docker Compose (api + postgres configuration)
+- [x] 9. Seed script (5 plans, 1 admin, 1 customer)
+- [x] 10. End-to-end check script passed
+
+## Module 2 - Auth, RBAC, Idempotency (Day 2)
+- [x] 1. Password hashing with bcrypt + automatic salt generation
+- [x] 2. Pydantic v2 schemas for registration, login, and token response
+- [x] 3. Registration endpoint (atomic user + customer profile creation)
+- [x] 4. JWT generation (short-lived access + long-lived refresh tokens)
+- [x] 5. Auth dependency (`get_current_user`) decoding Bearer JWT tokens
+- [x] 6. Backend RBAC dependencies (`require_admin`, `require_customer`)
+- [x] 7. Token refresh rotation endpoint (`/api/auth/refresh`)
+- [x] 8. Idempotency engine (`IdempotentRequest` dependency) with SHA-256 payload hashing
+- [x] 9. Complete automated test suite covering all 12 edge cases
+
+## Module 3 - Billing & Proration (Day 3)
+- [x] 1. Billing cycle period calculation in UTC
+- [x] 2. Pure proration math function (`calculate_proration`) with second-level precision
+- [x] 3. Invoice repository and schemas for itemized billing statements
+- [x] 4. Mid-cycle plan change logic with atomic DB transactions and proration invoice generation
+- [x] 5. REST API endpoint `POST /api/subscriptions/{id}/change-plan` with customer ownership authorization
+- [x] 6. Automated renewal scanner job (`process_due_renewals`)
+- [x] 7. Comprehensive Pytest suites for hand-calculated math, DB persistence, and background renewals
+
+## Module 4 - Payment Gateway & Webhooks (Day 4)
+- [x] 1. PaymentGateway interface/protocol & FakePaymentGateway simulator
+- [x] 2. Razorpay payment gateway adapter + order creation
+- [x] 3. Payment order generation endpoint (`POST /api/invoices/{id}/pay`)
+- [x] 4. HMAC-SHA256 signature verification utility
+- [x] 5. Webhook listener endpoint (`POST /api/webhooks/razorpay`) with signature validation & 400 rejection for forged payloads
+- [x] 6. Webhook event processor with atomic invoice `PAID` transition and subscription `ACTIVE` transition
+- [x] 7. Idempotent webhook handling catching duplicate event IDs and preventing replay side effects
+- [x] 8. Comprehensive test suite (`test_payments.py`) validating the full payment flow
+
+## Known gaps (be honest about these)
+- [x] Seed users have working bcrypt password hashes (`admin123` / `customer123`).
+- Invoicing tax is currently flat 0%; configurable GST/VAT rates arrive in Module 6 (PDF Invoicing).
+- Docker Compose config exists, verified against native Windows PostgreSQL; container deployment verified on Day 7.
+
+## Next
+Module 5 - Dunning Engine & Failed Payment Recovery (Day 5, Part 1)
