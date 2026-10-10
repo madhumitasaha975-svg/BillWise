@@ -20,6 +20,20 @@ services:
       retries: 10
 
   # ─────────────────────────────────────────────────────────────────────────────
+  # Redis 7 — Message broker for Celery asynchronous processing
+  # ─────────────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # BillWise FastAPI — Multi-stage built image
   # Startup sequence: wait for db health → migrate → seed → serve
   # ─────────────────────────────────────────────────────────────────────────────
@@ -31,6 +45,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-billwise}:${POSTGRES_PASSWORD:-billwise}@db:5432/${POSTGRES_DB:-billwise}
+      REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-development}
       SECRET_KEY: ${SECRET_KEY:-dev-secret-change-in-production}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
@@ -38,10 +53,6 @@ services:
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
-    # Three ordered startup steps chained with &&:
-    # 1. alembic upgrade head  → Apply all pending DB migrations atomically
-    # 2. python -m scripts.seed → Idempotently seed plans + demo users
-    # 3. uvicorn               → Serve the API
     command: >
       sh -c "
         echo '⏳ Running database migrations...' &&
@@ -54,13 +65,35 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Mount source code for hot-reload in development
       - ./backend:/app
     depends_on:
       db:
-        condition: service_healthy   # Wait for PostgreSQL health check to pass
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Celery Background Worker — Processes automated billing & notifications
+  # ─────────────────────────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-billwise}:${POSTGRES_PASSWORD:-billwise}@db:5432/${POSTGRES_DB:-billwise}
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-development}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-in-production}
+    command: celery -A app.core.celery_app worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   pgdata:
-    # Named volume persists database data across `docker compose down` restarts.
-    # Use `docker compose down -v` to wipe data during development resets.

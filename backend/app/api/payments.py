@@ -1,5 +1,7 @@
+import uuid
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -59,7 +61,6 @@ async def get_my_invoices(
         }
         for inv in invoices
     ]
-
 
 
 @router.post("/{invoice_id}/pay", response_model=PaymentOrderResponse)
@@ -144,3 +145,66 @@ async def download_invoice_pdf(
             "Content-Disposition": f'attachment; filename="{invoice.number}.pdf"',
         },
     )
+
+
+class SimulatePaymentRequest(BaseModel):
+    outcome: str = "succeeded"  # succeeded | failed
+
+
+@router.post("/{invoice_id}/simulate-payment")
+async def simulate_payment(
+    invoice_id: UUID,
+    payload: SimulatePaymentRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Simulates real-time payment gateway transaction (success or failure)
+    and triggers webhook processing, invoice status update, and cloud resource state.
+    """
+    user_repo = UserRepository(session)
+    invoice_repo = InvoiceRepository(session)
+    customer = await user_repo.get_customer_by_user_id(current_user.id)
+    invoice = await invoice_repo.get_by_id(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+    if current_user.role != UserRole.ADMIN and (not customer or invoice.customer_id != customer.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    payment_service = PaymentService(session)
+
+    if payload.outcome == "succeeded":
+        fake_event = {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": f"pay_sim_{uuid.uuid4().hex[:10]}",
+                        "notes": {"invoice_id": str(invoice.id)},
+                        "amount": invoice.total_minor,
+                        "currency": invoice.currency,
+                        "status": "captured",
+                    }
+                }
+            },
+        }
+        await payment_service.process_webhook_event(fake_event)
+        return {"message": "Payment simulation succeeded! Invoice marked as PAID, subscription ACTIVE."}
+    else:
+        fake_event = {
+            "event": "payment.failed",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": f"pay_sim_fail_{uuid.uuid4().hex[:10]}",
+                        "notes": {"invoice_id": str(invoice.id)},
+                        "amount": invoice.total_minor,
+                        "currency": invoice.currency,
+                        "status": "failed",
+                    }
+                }
+            },
+        }
+        await payment_service.process_webhook_event(fake_event)
+        return {
+            "message": "Payment simulation failed! Subscription transitioned to PAST_DUE (Dunning Grace Period active)."
+        }

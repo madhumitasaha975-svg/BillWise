@@ -19,3 +19,7 @@ httpx>=0.27
 
 # Module 6 - PDF generation
 reportlab>=4.0
+
+# Module 8 / Springboard - Celery & Redis Background Worker
+celery>=5.3
+redis>=5.0

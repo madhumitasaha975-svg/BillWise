@@ -35,6 +35,7 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     plan: Mapped["Plan"] = relationship()  # noqa: F821
+    customer: Mapped["Customer"] = relationship()  # noqa: F821
     billing_cycles: Mapped[list["BillingCycle"]] = relationship(back_populates="subscription")
 
 

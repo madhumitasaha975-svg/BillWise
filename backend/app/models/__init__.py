@@ -1,6 +1,7 @@
 # Importing every model here guarantees Base.metadata knows all tables
 # (Alembic autogenerate depends on this).
 from app.models.base import Base
+from app.models.cloud import CloudServer
 from app.models.customer import Customer
 from app.models.invoice import Invoice, InvoiceLineItem
 from app.models.payment import Payment
@@ -21,4 +22,5 @@ __all__ = [
     "Payment",
     "IdempotencyKey",
     "AuditLog",
+    "CloudServer",
 ]
