@@ -469,6 +469,98 @@ This guide compiles every core technical and system design question you can be a
 > 2. If the user is unauthenticated, it returns `<Navigate to='/login' replace />`.
 > 3. If a specific role is required (e.g. `requiredRole='admin'`) and the user's role is `customer`, it redirects them to `/dashboard` to prevent privilege escalation.
 > 4. If authorized, it renders the child route wrapped in the global `<Navbar />`."
+---
 
+# 📅 DAY 7 — MODULE 8: DOCKER, CONTAINERIZATION & PRODUCTION DEPLOYMENT
 
+### Q46: "Why do you use Docker for deploying BillWise? What problem does it solve?"
+> **Answer:**
+> "The classic 'it works on my machine' problem is caused by **environment drift** — your laptop has Python 3.13, the server has Python 3.9; you have asyncpg 0.29 installed, the server has 0.27. These subtle differences cause crashes in production that are impossible to reproduce locally.
+> Docker packages the exact Python interpreter version, all installed libraries, the OS base layer, and the application code into a single self-contained, portable **image**. Running `docker compose up --build` on any machine — your laptop, an AWS EC2, a GCP Cloud Run instance — produces a bit-for-bit identical runtime environment.
+> This is called **deployment parity**, and it's a fundamental production engineering principle."
+
+---
+
+### Q47: "Explain multi-stage Docker builds. Why did you implement them in BillWise?"
+> **Answer:**
+> "Multi-stage builds use multiple `FROM` statements in a single Dockerfile. Each `FROM` creates a temporary **stage** that can copy artifacts from previous stages.
+>
+> In BillWise:
+> - **Stage 1 (builder)**: Installs build tools like `gcc` and `libpq-dev` needed to compile native C extensions (`asyncpg` uses C-level PostgreSQL protocol bindings, `bcrypt` uses a C extension for hashing speed). This stage creates a large image with compilers.
+> - **Stage 2 (runtime)**: Copies only the `/install` directory containing compiled packages from the builder. The final image contains **zero build tools**.
+>
+> Why this matters:
+> 1. **Smaller image**: Build tools (gcc, make, etc.) add hundreds of MBs. The runtime image is significantly leaner (~180MB vs ~400MB).
+> 2. **Security**: If a container is compromised, attackers cannot use `gcc` or other compilers to compile malicious binaries inside the container. Removing tools reduces the **attack surface**.
+> This technique is a production engineering best practice and expected in senior engineering interviews."
+
+---
+
+### Q48: "What is a Docker health check, and why is it critical in BillWise's docker-compose.yml?"
+> **Answer:**
+> "A health check is a command Docker runs periodically to determine whether a container is truly ready to accept traffic, not just running.
+>
+> BillWise's `db` service has:
+> ```yaml
+> healthcheck:
+>   test: [\"CMD-SHELL\", \"pg_isready -U billwise -d billwise\"]
+>   interval: 5s
+>   retries: 10
+> ```
+> `pg_isready` exits with code 0 only when PostgreSQL is accepting connections. Without this, Docker would mark the container as `Up` the moment the process starts — but PostgreSQL takes 2-5 seconds to initialize its data directory on a fresh volume.
+>
+> The `api` service uses `depends_on: db: condition: service_healthy` — it will not start (and therefore won't run `alembic upgrade head`) until PostgreSQL is ready. Without this, the Alembic migration command would fail with a connection refused error and the container would crash on every cold start."
+
+---
+
+### Q49: "What is a named Docker volume? How is `pgdata` different from a bind mount?"
+> **Answer:**
+> "Docker has two ways to persist data outside a container's lifecycle:
+>
+> 1. **Bind mount**: Maps a specific path on the host machine (e.g. `./postgres-data:/var/lib/postgresql`) to the container. The data is a folder on your local filesystem.
+> 2. **Named volume** (`pgdata`): Docker manages the storage location internally. The volume persists across `docker compose down` restarts.
+>
+> In BillWise we use a **named volume** (`pgdata`):
+> - `docker compose down` → containers stop, but the `pgdata` volume (all PostgreSQL rows) survive
+> - `docker compose up` → new containers start, connect to the same volume, data is intact
+> - `docker compose down -v` → explicitly deletes the volume (clean slate for development resets)
+>
+> Named volumes are preferred in production because they're portable, Docker-managed, and don't expose internal paths to the host filesystem."
+
+---
+
+### Q50: "Why is the startup command `alembic upgrade head && python -m scripts.seed && uvicorn` ordered this way?"
+> **Answer:**
+> "The three commands must run in strict order because each depends on the previous:
+>
+> 1. `alembic upgrade head` — Applies all pending SQL migrations to create or alter tables. If the schema hasn't been applied, any INSERT or SELECT by the seed script or the app will throw a `UndefinedTable` PostgreSQL error.
+> 2. `python -m scripts.seed` — The seed script is **idempotent** (safe to run on every startup). It checks whether each plan code and user email already exists before creating them. It depends on the schema existing from step 1.
+> 3. `uvicorn app.main:app` — The HTTP server starts serving API requests only after the database schema is correct and demo data is present. If uvicorn started first, a user hitting `/api/auth/login` before seed completion would receive a 500 error.
+>
+> This pattern — **migrate → seed → serve** — is the standard container startup sequence for stateful web applications."
+
+---
+
+### Q51: "How do you manage secrets like database passwords and API keys in production Docker deployments?"
+> **Answer:**
+> "Secrets must **never** be hardcoded in source code or committed to Git — including in `docker-compose.yml`. Our approach:
+>
+> 1. **`.env.example`** — Committed to Git. Documents every required environment variable (database URL, secret key, Razorpay credentials) with placeholder values. Acts as the contract between the development and operations teams.
+> 2. **`.env`** — Created by each developer/ops engineer by copying `.env.example`. Added to `.gitignore`. Docker Compose automatically reads `.env` from the project root and interpolates variables like `${SECRET_KEY}`.
+> 3. **Production secrets management** — In real deployments (AWS, GCP), secrets are injected at runtime via services like **AWS Secrets Manager**, **GCP Secret Manager**, or **Kubernetes Secrets** mounted as environment variables. The `.env` file is only for local development.
+>
+> This ensures zero secrets in the Git history. An attacker who clones the repository finds only placeholder values."
+
+---
+
+### Q52: "If a Docker container crashes in production, what mechanisms ensure BillWise recovers automatically?"
+> **Answer:**
+> "Several layers of automatic recovery:
+>
+> 1. **`restart: unless-stopped`** — Both `db` and `api` services in docker-compose.yml have this restart policy. Docker automatically restarts crashed containers unless they were explicitly stopped by an operator. On a server reboot, Docker daemon restarts and brings BillWise back up.
+> 2. **Health check gating** — `api` waits for `db` to be healthy before starting. If the database is temporarily down, the api container won't start in a broken state.
+> 3. **Alembic idempotency** — `alembic upgrade head` is idempotent. If the container crashes mid-startup and restarts, running migrations again is safe — Alembic checks `alembic_version` and skips already-applied migrations.
+> 4. **Seed idempotency** — `python -m scripts.seed` uses `get-or-create` logic. Re-running after a restart does not create duplicate plans or users.
+>
+> In production with Kubernetes, `Deployment` replicas and liveness/readiness probes provide the same guarantees at scale."
 

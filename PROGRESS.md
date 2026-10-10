@@ -76,5 +76,15 @@
 - [x] Invoicing tax and GST breakdown integrated in PDF invoices.
 - Docker Compose config exists, verified against native Windows PostgreSQL; container deployment verified on Day 7.
 
+## Module 8 - Docker, Containerization & Production Deployment (Day 7)
+- [x] 1. Multi-stage Dockerfile (builder: gcc + pip compile; runtime: lean final image, zero build tools)
+- [x] 2. Production-hardened `docker-compose.yml` with `restart: unless-stopped` and `target: runtime`
+- [x] 3. Startup sequencing: `alembic upgrade head → seed → uvicorn` via chained shell command
+- [x] 4. PostgreSQL healthcheck gating (`pg_isready`) — api waits for db to be accepting connections
+- [x] 5. Named volume (`pgdata`) for persistent PostgreSQL data across container restarts
+- [x] 6. Port isolation: db maps to host port `5433` to avoid conflict with local PostgreSQL on `5432`
+- [x] 7. `.env.example` committed — documents every secret variable, nothing hardcoded in compose file
+- [x] 8. Day 7 Docker interview questions (Q46–Q52) added to `docs/INTERVIEW_PREP.md`
+
 ## Next
-Module 8 - Production Deployment & Docker Compose Verification (Day 7)
+Module 9 (Optional) - Production Hosting on Render / Railway / Fly.io

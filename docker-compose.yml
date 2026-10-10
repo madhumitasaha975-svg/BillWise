@@ -1,12 +1,16 @@
 services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # PostgreSQL 16 — Managed by Docker, persisted via named volume
+  # ─────────────────────────────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-billwise}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-billwise}
       POSTGRES_DB: ${POSTGRES_DB:-billwise}
     ports:
-      - "5432:5432"
+      - "5433:5432"   # Use 5433 on host to avoid conflicts with local PostgreSQL
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,20 +19,48 @@ services:
       timeout: 5s
       retries: 10
 
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BillWise FastAPI — Multi-stage built image
+  # Startup sequence: wait for db health → migrate → seed → serve
+  # ─────────────────────────────────────────────────────────────────────────────
   api:
-    build: ./backend
-    # Inside Docker the database host is the service name `db`, not localhost.
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime          # Use only the lean runtime stage
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-billwise}:${POSTGRES_PASSWORD:-billwise}@db:5432/${POSTGRES_DB:-billwise}
-      APP_ENV: development
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      APP_ENV: ${APP_ENV:-development}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-in-production}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+    # Three ordered startup steps chained with &&:
+    # 1. alembic upgrade head  → Apply all pending DB migrations atomically
+    # 2. python -m scripts.seed → Idempotently seed plans + demo users
+    # 3. uvicorn               → Serve the API
+    command: >
+      sh -c "
+        echo '⏳ Running database migrations...' &&
+        alembic upgrade head &&
+        echo '🌱 Seeding default plans and demo users...' &&
+        python -m scripts.seed &&
+        echo '🚀 Starting BillWise API server...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
     ports:
       - "8000:8000"
     volumes:
+      # Mount source code for hot-reload in development
       - ./backend:/app
     depends_on:
       db:
-        condition: service_healthy
+        condition: service_healthy   # Wait for PostgreSQL health check to pass
 
 volumes:
   pgdata:
+    # Named volume persists database data across `docker compose down` restarts.
+    # Use `docker compose down -v` to wipe data during development resets.
