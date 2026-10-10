@@ -33,3 +33,12 @@
 - **HMAC-SHA256 Signature Verification**: To verify that a webhook genuinely originated from Razorpay (and not a malicious actor posting fake JSON), Razorpay computes `HMAC-SHA256(request_body, shared_secret)` and sends the signature in the `X-Razorpay-Signature` header. Our server recalculates the exact same HMAC in constant time (`hmac.compare_digest`) to prevent timing attacks.
 - **Webhook Idempotency**: Payment gateways use retry policies when they don't receive an immediate 200 OK (e.g. temporary network blips). Therefore, a webhook may be delivered multiple times. We store processed `event_id`s in a `WebhookEvent` table; if an event is already recorded, we acknowledge with `200 OK` and skip processing to avoid duplicate accounting entries.
 - **Gateway Abstraction Layer**: By defining a `PaymentGateway` protocol, the application business logic interacts with clean domain interfaces (`create_order`, `verify_webhook_signature`). We can switch between `FakePaymentGateway` for fast local testing and `RazorpayGateway` in production with a single configuration flag without modifying any service code.
+
+---
+
+## Day 5 (Part 1) - Module 5 (Dunning Engine & Failed Payment Recovery)
+- **Involuntary vs. Voluntary Churn**: Voluntary churn happens when a customer deliberately clicks cancel. Involuntary churn happens when a legitimate paying customer is booted out because their card expired or their bank had a temporary 2-minute outage. Dunning protects against involuntary churn by granting a grace period and retrying smartly.
+- **Grace Period State (`PAST_DUE`)**: When a renewal or proration charge fails, moving the subscription immediately to `SUSPENDED` causes customer outrage. Transitioning to `PAST_DUE` keeps service accessible while automated retry jobs re-attempt payment on Days 1, 3, and 5.
+- **State Machine Protection**: Our strict state machine rules prevent illegal jumps (e.g. `trialing -> past_due` was prevented because you cannot owe debt on an unactivated trial). Subscriptions must move `ACTIVE -> PAST_DUE -> SUSPENDED` (if exhausted) or `PAST_DUE -> ACTIVE` (if recovered).
+- **Immutable Audit Trails**: Financial systems require complete accountability. Every dunning action (`entered_past_due`, `retry_failed`, `recovered`, `exhausted_suspended`) writes an immutable record to the `audit_logs` table with details of attempt numbers, invoice numbers, and error reasons for customer support and audit reviews.
+

@@ -293,3 +293,61 @@ This guide compiles every core technical and system design question you can be a
 > "HMAC-SHA256 computes a cryptographic digest of the **exact byte sequence** sent over the wire.
 > If you parse the body with `request.json()` and then serialize it back to bytes using `json.dumps()`, Python may change whitespace, strip trailing newlines, or reorder dictionary keys.
 > Even a single rearranged whitespace character or different key order produces a completely different SHA-256 hash, causing legitimate webhooks to fail signature verification. Always verify the signature against the untouched raw byte stream directly."
+
+---
+
+# 📅 DAY 5 (PART 1) — MODULE 5: DUNNING ENGINE & FAILED PAYMENT RECOVERY
+
+### Q31: "What is Dunning Management and why is it essential in recurring SaaS billing architectures?"
+> **Answer:**
+> "Dunning is the automated management of payment failures and customer communication before a recurring subscription is terminated.
+> In recurring subscription models, credit/debit card charges frequently fail for transient reasons: bank server timeouts, temporary daily card limits, or card re-issuance.
+> If a platform immediately cuts off service or cancels accounts upon the first failed charge, it introduces severe friction, frustrates customers, and bleeds recurring revenue.
+> A robust dunning engine implements an automated grace period, schedules smart retries over multiple days (e.g. Days 1, 3, 5), logs audit trails, and only suspends access if recovery attempts are completely exhausted."
+
+---
+
+### Q32: "What is the difference between Voluntary Churn and Involuntary Churn?"
+> **Answer:**
+> "* **Voluntary Churn**: Occurs when a customer intentionally and consciously decides to leave your product (e.g. clicking 'Cancel Subscription' because they no longer need the software or switched to a competitor).
+> * **Involuntary (Passive) Churn**: Occurs when a customer wants to remain subscribed, but their payment fails silently in the background due to technical or banking issues (e.g. expired card, insufficient funds, bank fraud filter false positive).
+> 
+> Studies show that **up to 40% of all SaaS customer churn is involuntary**. The Dunning Engine directly recovers this otherwise lost revenue without requiring customer support intervention."
+
+---
+
+### Q33: "Walk me through the Dunning state machine and lifecycle transitions in BillWise."
+> **Answer:**
+> "Our state machine strictly enforces this recovery lifecycle:
+> 1. **Initial Failure**: A customer's renewal or proration charge fails (`payment.failed` webhook). The subscription transitions:
+>    $$\text{ACTIVE} \longrightarrow \text{PAST\_DUE}$$
+>    The invoice remains in `OPEN` status, and an initial `Payment` attempt record is marked `FAILED`.
+> 2. **Grace Period Retries**: A background worker (`process_dunning_retries`) queries all `PAST_DUE` subscriptions with open invoices and invokes our retry policy (`MAX_DUNNING_ATTEMPTS = 3`).
+> 3. **Recovery Path**: If any retry attempt succeeds:
+>    * The invoice transitions `OPEN -> PAID`.
+>    * The subscription transitions:
+>      $$\text{PAST\_DUE} \longrightarrow \text{ACTIVE}$$
+>    * An audit log `dunning.recovered` is emitted.
+> 4. **Exhaustion Path**: If retry #3 fails:
+>    * The retry counter reaches `MAX_DUNNING_ATTEMPTS`.
+>    * The state machine triggers:
+>      $$\text{PAST\_DUE} \longrightarrow \text{SUSPENDED}$$
+>    * An audit log `dunning.exhausted_suspended` is recorded, locking feature access."
+
+---
+
+### Q34: "Why do invoices remain in `OPEN` status during the dunning grace period rather than `FAILED` or `VOID`?"
+> **Answer:**
+> "In GAAP/IFRS accounting and database normalization:
+> * An invoice represents an **outstanding debt obligation** that the customer owes to the business. As long as the customer is within their grace period and we are actively trying to recover payment, the debt remains valid and unsettled (`OPEN`).
+> * `Payment` represents individual **transaction attempts** against that invoice. An invoice can have multiple payment attempts (`Payment.attempt_number = 1, 2, 3`), where attempts 1 and 2 may have `status = FAILED`, but attempt 3 has `status = SUCCEEDED`.
+> * Marking an invoice `VOID` would legally forgive the debt, and marking it `FAILED` would prevent subsequent retry attempts from settling the invoice."
+
+---
+
+### Q35: "Why did attempting `change_plan` on a `PAST_DUE` subscription throw an `InvalidSubscriptionStateError`?"
+> **Answer:**
+> "In BillWise, our domain service layer enforces financial integrity rules. A customer currently in `PAST_DUE` status has an unsettled balance and overdue payment.
+> Allowing a customer to switch tiers, upgrade, or calculate new proration charges while their previous invoice is delinquent would create compounded debt, race conditions in period dates, and credit leakage.
+> Subscriptions must be restored to `ACTIVE` before any mid-cycle plan modifications can be initiated."
+

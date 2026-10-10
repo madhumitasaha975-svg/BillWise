@@ -42,10 +42,20 @@
 - [x] 7. Idempotent webhook handling catching duplicate event IDs and preventing replay side effects
 - [x] 8. Comprehensive test suite (`test_payments.py`) validating the full payment flow
 
+## Module 5 - Dunning Engine & Failed Payment Recovery (Day 5, Part 1)
+- [x] 1. Automated retry schedule policy (`MAX_DUNNING_ATTEMPTS = 3`, retry intervals)
+- [x] 2. Webhook failure handler updating `ACTIVE -> PAST_DUE` (grace period)
+- [x] 3. Core dunning retry service (`app/services/dunning_service.py`) executing smart retries
+- [x] 4. Automated recovery to `ACTIVE` with `InvoiceStatus.PAID` transition on successful retry
+- [x] 5. State machine transition `PAST_DUE -> SUSPENDED` upon retry exhaustion
+- [x] 6. Immutable audit logging (`AuditLog`) for all dunning events (`entered_past_due`, `retry_failed`, `recovered`, `exhausted_suspended`)
+- [x] 7. Background dunning scanner worker (`app/jobs/dunning.py`)
+- [x] 8. Comprehensive automated test suite (`tests/test_dunning.py`) passing with 100% green coverage
+
 ## Known gaps (be honest about these)
 - [x] Seed users have working bcrypt password hashes (`admin123` / `customer123`).
 - Invoicing tax is currently flat 0%; configurable GST/VAT rates arrive in Module 6 (PDF Invoicing).
 - Docker Compose config exists, verified against native Windows PostgreSQL; container deployment verified on Day 7.
 
 ## Next
-Module 5 - Dunning Engine & Failed Payment Recovery (Day 5, Part 1)
+Module 6 - PDF Invoice Generation & Secure Downloads (Day 5, Part 2)

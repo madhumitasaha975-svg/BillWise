@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.payment_gateway import get_payment_gateway
 from app.models import Payment
 from app.models.enums import InvoiceStatus, PaymentStatus, SubscriptionStatus
-from app.models.system import IdempotencyKey
+from app.models.system import AuditLog, IdempotencyKey
 from app.repositories.invoice_repository import InvoiceRepository
 from app.repositories.payment_repository import PaymentRepository
 from app.repositories.subscription_repository import SubscriptionRepository
@@ -122,6 +122,19 @@ class PaymentService:
                     if subscription and subscription.status == SubscriptionStatus.ACTIVE:
                         if can_transition(subscription.status, SubscriptionStatus.PAST_DUE):
                             subscription.status = SubscriptionStatus.PAST_DUE
+                            self.session.add(
+                                AuditLog(
+                                    action="dunning.entered_past_due",
+                                    entity_type="subscription",
+                                    entity_id=str(subscription.id),
+                                    details={
+                                        "invoice_id": str(invoice.id),
+                                        "invoice_number": invoice.number,
+                                        "failure_reason": error_desc,
+                                        "attempt": payment.attempt_number,
+                                    },
+                                )
+                            )
 
         # 5. Record event in IdempotencyKey table so duplicates are caught
         idem_record = IdempotencyKey(
