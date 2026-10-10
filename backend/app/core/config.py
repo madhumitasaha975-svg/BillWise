@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
+    # Payment Gateway (Razorpay)
+    razorpay_key_id: str = "rzp_test_placeholder"
+    razorpay_key_secret: str = "rzp_test_secret_placeholder"
+    razorpay_webhook_secret: str = "billwise_webhook_secret_key_12345"
+    fake_gateway_mode: bool = True
+
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 
 
